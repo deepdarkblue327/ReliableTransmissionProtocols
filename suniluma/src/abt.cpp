@@ -8,6 +8,7 @@ using namespace std;
 string buffer[1000];
 int seqno[1000];
 int index = 0;
+int acks[1000];
 
 struct pkt gen_pkt(string message, int seqnum) {
     struct pkt p;
@@ -58,10 +59,16 @@ void A_output(struct msg message)
     buffer[index++] = (char*)message.data;
     for(int i = 0; i < 1000; i++) {
         if(buffer[i] != "") {
-            tolayer3(0,gen_pkt(buffer[i],seqno[i]));
+            if(acks[i] != -1) {
+                return;
+            }
+            //cout<<"starttimer"<<endl;
             starttimer(0,20.0);
+            tolayer3(0,gen_pkt(buffer[i],seqno[i]));
+            acks[i] = 0;
             break;
         }
+
     }
 }
 
@@ -69,27 +76,31 @@ void A_output(struct msg message)
 void A_input(struct pkt packet)
 {
     if(validate_checksum(packet)) {
-        cout<<"DATE"<<endl;
         for(int i = 0; i < 1000; i++) {
+            string a = packet.payload;
             if(buffer[i]!= "") {
-                buffer[i] = "";
-                cout<<"YEEE"<<endl;
-                stoptimer(0);
+                //cout<<"stoptimer"<<endl;
+                if(acks[i] == 0) {
+                    stoptimer(0);
+                    buffer[i] = "";
+                    acks[i] = 1;
+                    break;
+                }
             }
         }
     }
-
 }
 
 /* called when A's timer goes off */
 void A_timerinterrupt()
-{
+{   cout<<"Timer Interrupt\n";
     for(int i = 0; i < 1000; i++) {
         if(buffer[i]!= "") {
+            starttimer(0,20.0);
             tolayer3(0,gen_pkt(buffer[i],seqno[i]));
+            break;
         }
     }
-
 }
 
 /* the following routine will be called once (only) before any other */
@@ -98,18 +109,22 @@ void A_init()
 {
     for(int i = 0; i < 1000; i++) {
         seqno[i] = i%2;
+        acks[i] = -1;
     }
 }
 
 /* Note that with simplex transfer from a-to-B, there is no B_output() */
-
+int b_ack = 0;
 /* called from layer 3, when a packet arrives for layer 4 at B*/
 void B_input(struct pkt packet)
 {
     if(validate_checksum(packet)) {
-        cout<<"NOOO"<<endl;
+
+        if(b_ack%2 == packet.acknum) {
+            tolayer5(1,packet.payload);
+            b_ack+=1;
+        }
         tolayer3(1,packet);
-        tolayer5(1,packet.payload);
     }
 }
 
