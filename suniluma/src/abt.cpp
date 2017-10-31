@@ -5,21 +5,25 @@
 #include<vector>
 using namespace std;
 
-string buffer[1000];
-int seqno[1000];
+#define BUFFER 1000
+#define MSG_SIZE 20
+#define INTERRUPT 20.0
+
+string buffer[BUFFER];
+int seqno[BUFFER];
 int index = 0;
-int acks[1000];
+int acks[BUFFER];
 int acked = 0;
 
 struct pkt gen_pkt(string message, int seqnum) {
     struct pkt p;
     p.seqnum = seqnum;
     p.acknum = seqnum;
-    for(int i = 0; i < 20; i++) {
+    for(int i = 0; i < MSG_SIZE; i++) {
         p.payload[i] = (char)message[i];
     }
     p.checksum = 0;
-    for(int i = 0; i < 20; i++) {
+    for(int i = 0; i < MSG_SIZE; i++) {
         p.checksum += (int)p.payload[i];
     }
     p.checksum += p.seqnum + p.acknum;
@@ -28,7 +32,7 @@ struct pkt gen_pkt(string message, int seqnum) {
 
 bool validate_checksum(struct pkt p) {
     int checksum = 0;
-    for(int i = 0; i < 20; i++) {
+    for(int i = 0; i < MSG_SIZE; i++) {
         checksum += (int)p.payload[i];
     }
     checksum += p.seqnum + p.acknum;
@@ -58,13 +62,13 @@ bool validate_checksum(struct pkt p) {
 void A_output(struct msg message)
 {
     buffer[index++] = (char*)message.data;
-    for(int i = acked; i < 1000; i++) {
+    for(int i = acked; i < BUFFER; i++) {
         if(buffer[i] != "") {
             if(acks[i] != -1) {
                 return;
             }
             //cout<<"starttimer"<<endl;
-            starttimer(0,20.0);
+            starttimer(0,INTERRUPT);
             tolayer3(0,gen_pkt(buffer[i],seqno[i]));
             acks[i] = 0;
             break;
@@ -76,7 +80,7 @@ void A_output(struct msg message)
 void A_input(struct pkt packet)
 {
     if(validate_checksum(packet)) {
-        for(int i = acked; i < 1000; i++) {
+        for(int i = acked; i < BUFFER; i++) {
             string a = packet.payload;
             if(buffer[i]!= "" && acks[i] == 0) {
                 stoptimer(0);
@@ -92,9 +96,9 @@ void A_input(struct pkt packet)
 /* called when A's timer goes off */
 void A_timerinterrupt()
 {
-    for(int i = acked; i < 1000; i++) {
+    for(int i = acked; i < BUFFER; i++) {
         if(buffer[i]!= "") {
-            starttimer(0,20.0);
+            starttimer(0,INTERRUPT);
             tolayer3(0,gen_pkt(buffer[i],seqno[i]));
             break;
         }
@@ -105,7 +109,7 @@ void A_timerinterrupt()
 /* entity A routines are called. You can use it to do any initialization */
 void A_init()
 {
-    for(int i = 0; i < 1000; i++) {
+    for(int i = 0; i < BUFFER; i++) {
         seqno[i] = i%2;
         acks[i] = -1;
     }

@@ -1,5 +1,44 @@
 #include "../include/simulator.h"
 #include "../include/helper.h"
+#include<iostream>
+#include<string>
+#include<vector>
+using namespace std;
+
+string buffer[1000];
+int seqno[1000];
+int index = 0;
+int acks[1000];
+int acked = 0;
+
+struct pkt gen_pkt(string message, int seqnum) {
+    struct pkt p;
+    p.seqnum = seqnum;
+    p.acknum = seqnum;
+    for(int i = 0; i < 20; i++) {
+        p.payload[i] = (char)message[i];
+    }
+    p.checksum = 0;
+    for(int i = 0; i < 20; i++) {
+        p.checksum += (int)p.payload[i];
+    }
+    p.checksum += p.seqnum + p.acknum;
+    return p;
+}
+
+bool validate_checksum(struct pkt p) {
+    int checksum = 0;
+    for(int i = 0; i < 20; i++) {
+        checksum += (int)p.payload[i];
+    }
+    checksum += p.seqnum + p.acknum;
+    if(checksum == p.checksum) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 /* ******************************************************************
  ALTERNATING BIT AND GO-BACK-N NETWORK EMULATOR: VERSION 1.1  J.F.Kurose
 
@@ -18,7 +57,8 @@
 /* called from layer 5, passed the data to be sent to other side */
 void A_output(struct msg message)
 {
-
+    buffer[index++] = (char*)message.data;
+    
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
