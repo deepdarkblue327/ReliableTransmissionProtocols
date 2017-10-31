@@ -9,6 +9,7 @@ string buffer[1000];
 int seqno[1000];
 int index = 0;
 int acks[1000];
+int acked = 0;
 
 struct pkt gen_pkt(string message, int seqnum) {
     struct pkt p;
@@ -57,7 +58,7 @@ bool validate_checksum(struct pkt p) {
 void A_output(struct msg message)
 {
     buffer[index++] = (char*)message.data;
-    for(int i = 0; i < 1000; i++) {
+    for(int i = acked; i < 1000; i++) {
         if(buffer[i] != "") {
             if(acks[i] != -1) {
                 return;
@@ -68,7 +69,6 @@ void A_output(struct msg message)
             acks[i] = 0;
             break;
         }
-
     }
 }
 
@@ -76,16 +76,14 @@ void A_output(struct msg message)
 void A_input(struct pkt packet)
 {
     if(validate_checksum(packet)) {
-        for(int i = 0; i < 1000; i++) {
+        for(int i = acked; i < 1000; i++) {
             string a = packet.payload;
-            if(buffer[i]!= "") {
-                //cout<<"stoptimer"<<endl;
-                if(acks[i] == 0) {
-                    stoptimer(0);
-                    buffer[i] = "";
-                    acks[i] = 1;
-                    break;
-                }
+            if(buffer[i]!= "" && acks[i] == 0) {
+                stoptimer(0);
+                buffer[i] = "";
+                acks[i] = 1;
+                acked += 1;
+                break;
             }
         }
     }
@@ -93,8 +91,8 @@ void A_input(struct pkt packet)
 
 /* called when A's timer goes off */
 void A_timerinterrupt()
-{   cout<<"Timer Interrupt\n";
-    for(int i = 0; i < 1000; i++) {
+{
+    for(int i = acked; i < 1000; i++) {
         if(buffer[i]!= "") {
             starttimer(0,20.0);
             tolayer3(0,gen_pkt(buffer[i],seqno[i]));
