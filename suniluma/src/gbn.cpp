@@ -5,21 +5,27 @@
 #include<vector>
 using namespace std;
 
-string buffer[1000];
-int seqno[1000];
+#define BUFFER 1000
+#define MSG_SIZE 20
+#define INTERRUPT 20.0
+
+string buffer[BUFFER];
+int seqno[BUFFER];
 int index = 0;
-int acks[1000];
 int acked = 0;
+
+int win_start = 0;
+int win_end = 0;
 
 struct pkt gen_pkt(string message, int seqnum) {
     struct pkt p;
     p.seqnum = seqnum;
     p.acknum = seqnum;
-    for(int i = 0; i < 20; i++) {
+    for(int i = 0; i < MSG_SIZE; i++) {
         p.payload[i] = (char)message[i];
     }
     p.checksum = 0;
-    for(int i = 0; i < 20; i++) {
+    for(int i = 0; i < MSG_SIZE; i++) {
         p.checksum += (int)p.payload[i];
     }
     p.checksum += p.seqnum + p.acknum;
@@ -28,7 +34,7 @@ struct pkt gen_pkt(string message, int seqnum) {
 
 bool validate_checksum(struct pkt p) {
     int checksum = 0;
-    for(int i = 0; i < 20; i++) {
+    for(int i = 0; i < MSG_SIZE; i++) {
         checksum += (int)p.payload[i];
     }
     checksum += p.seqnum + p.acknum;
@@ -58,18 +64,48 @@ bool validate_checksum(struct pkt p) {
 void A_output(struct msg message)
 {
     buffer[index++] = (char*)message.data;
-    
+    for(int i = win_start; i < win_end && i < BUFFER; i++) {
+        if(buffer[i] == "") {
+            return;
+        } else {
+            if(i == win_start) {
+                starttimer(0,INTERRUPT);
+            }
+            tolayer3(0,gen_pkt(buffer[i],seqno[i]));
+        }
+
+    }
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
 void A_input(struct pkt packet)
 {
+    if(validate_checksum(packet)) {
 
+        win_start = packet.acknum+1;
+        win_end = packet.acknum+getwinsize();
+        stoptimer(0);
+        if(win_start != index) {
+            starttimer(0,INTERRUPT);
+        }
+    }
+    cout<<win_end<<endl;
 }
 
 /* called when A's timer goes off */
 void A_timerinterrupt()
 {
+    for(int i = win_start; i < win_end && i < BUFFER; i++) {
+        if(buffer[i] == "") {
+            return;
+        } else {
+            if(i == win_start) {
+                starttimer(0,INTERRUPT);
+            }
+            tolayer3(0,gen_pkt(buffer[i],seqno[i]));
+        }
+
+    }
 
 }
 
@@ -77,15 +113,27 @@ void A_timerinterrupt()
 /* entity A routines are called. You can use it to do any initialization */
 void A_init()
 {
-
+    for(int i = 0; i < BUFFER; i++) {
+        seqno[i] = i;
+    }
+    win_end = getwinsize();
 }
 
 /* Note that with simplex transfer from a-to-B, there is no B_output() */
-
+int b_ack = 0;
+struct pkt latest;
 /* called from layer 3, when a packet arrives for layer 4 at B*/
 void B_input(struct pkt packet)
 {
+    if(validate_checksum(packet)) {
 
+        if(b_ack == packet.acknum) {
+            tolayer5(1,packet.payload);
+            b_ack+=1;
+            latest = packet;
+        }
+    }
+    tolayer3(1,latest);
 }
 
 /* the following rouytine will be called once (only) before any other */
