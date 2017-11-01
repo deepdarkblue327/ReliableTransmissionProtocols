@@ -10,10 +10,11 @@ using namespace std;
 #define INTERRUPT 20.0
 
 string buffer[BUFFER];
+struct pkt buf[BUFFER];
 int seqno[BUFFER];
 int index = 0;
 int acked = 0;
-
+int acks[BUFFER];
 int win_start = 0;
 int win_end = 0;
 
@@ -63,15 +64,17 @@ bool validate_checksum(struct pkt p) {
 /* called from layer 5, passed the data to be sent to other side */
 void A_output(struct msg message)
 {
+    buf[index] = gen_pkt((char*)message.data,index);
     buffer[index++] = (char*)message.data;
     for(int i = win_start; i < win_end && i < BUFFER; i++) {
         if(buffer[i] == "") {
             return;
-        } else {
+        } else if (acks[i] != 0){
             if(i == win_start) {
                 starttimer(0,INTERRUPT);
             }
-            tolayer3(0,gen_pkt(buffer[i],seqno[i]));
+            tolayer3(0,buf[i]);
+            acks[i] = 0;
         }
 
     }
@@ -80,10 +83,14 @@ void A_output(struct msg message)
 /* called from layer 3, when a packet arrives for layer 4 */
 void A_input(struct pkt packet)
 {
-    if(validate_checksum(packet)) {
 
-        win_start = packet.acknum+1;
-        win_end = packet.acknum+getwinsize();
+    if(validate_checksum(packet)) {
+        if(acks[packet.acknum] == 1) {
+            return;
+        }
+        win_start = packet.acknum + 1;
+        win_end = win_start + getwinsize();
+        acks[packet.acknum] = 1;
         stoptimer(0);
         if(win_start != index) {
             starttimer(0,INTERRUPT);
@@ -101,7 +108,7 @@ void A_timerinterrupt()
             if(i == win_start) {
                 starttimer(0,INTERRUPT);
             }
-            tolayer3(0,gen_pkt(buffer[i],seqno[i]));
+            tolayer3(0,buf[i]);
         }
 
     }
@@ -114,6 +121,7 @@ void A_init()
 {
     for(int i = 0; i < BUFFER; i++) {
         seqno[i] = i;
+        acks[i] = -1;
     }
     win_end = getwinsize();
 }
@@ -130,9 +138,11 @@ void B_input(struct pkt packet)
             tolayer5(1,packet.payload);
             b_ack+=1;
             latest = packet;
+            tolayer3(1,latest);
         }
+
+
     }
-    tolayer3(1,latest);
 }
 
 /* the following rouytine will be called once (only) before any other */
