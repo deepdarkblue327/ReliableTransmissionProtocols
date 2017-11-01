@@ -89,7 +89,6 @@ void A_input(struct pkt packet)
             starttimer(0,INTERRUPT);
         }
     }
-    cout<<win_end<<endl;
 }
 
 /* called when A's timer goes off */
