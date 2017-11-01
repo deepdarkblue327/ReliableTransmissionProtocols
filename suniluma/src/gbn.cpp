@@ -138,10 +138,10 @@ void B_input(struct pkt packet)
             tolayer5(1,packet.payload);
             b_ack+=1;
             latest = packet;
-            tolayer3(1,latest);
+
         }
 
-
+        tolayer3(1,latest);
     }
 }
 
