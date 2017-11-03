@@ -1,8 +1,6 @@
 #include "../include/simulator.h"
-#include "../include/helper.h"
 #include<iostream>
 #include<string>
-#include<vector>
 using namespace std;
 
 #define BUFFER 1000
