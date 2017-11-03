@@ -7,7 +7,7 @@ using namespace std;
 
 #define BUFFER 1000
 #define MSG_SIZE 20
-#define INTERRUPT 20.0
+#define INTERRUPT 12.0
 
 string buffer[BUFFER];
 struct pkt buf[BUFFER];
@@ -17,6 +17,7 @@ int acked = 0;
 int acks[BUFFER];
 int win_start = 0;
 int win_end = 0;
+int window_size;
 
 struct pkt gen_pkt(string message, int seqnum) {
     struct pkt p;
@@ -64,20 +65,18 @@ bool validate_checksum(struct pkt p) {
 /* called from layer 5, passed the data to be sent to other side */
 void A_output(struct msg message)
 {
-    buf[index] = gen_pkt((char*)message.data,index);
-    buffer[index++] = (char*)message.data;
-    for(int i = win_start; i < win_end && i < BUFFER; i++) {
-        if(buffer[i] == "") {
-            return;
-        } else if (acks[i] != 0){
-            if(i == win_start) {
-                starttimer(0,INTERRUPT);
-            }
-            tolayer3(0,buf[i]);
-            acks[i] = 0;
-        }
 
+    buf[index] = gen_pkt((char*)message.data,index);
+    buffer[index] = (char*)message.data;
+    if(index < win_end) {
+        if(index == win_start) {
+            starttimer(0,INTERRUPT);
+        }
+        tolayer3(0,buf[index]);
+        acks[index] = 0;
     }
+    index++;
+    cout<<index<<endl;
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
@@ -85,12 +84,13 @@ void A_input(struct pkt packet)
 {
 
     if(validate_checksum(packet)) {
-        if(acks[packet.acknum] == 1) {
+        if(acks[packet.acknum] != 0) {
             return;
         }
         win_start = packet.acknum + 1;
-        win_end = win_start + getwinsize();
+        win_end = win_start + window_size;
         acks[packet.acknum] = 1;
+        buffer[packet.acknum] = "";
         stoptimer(0);
         if(win_start != index) {
             starttimer(0,INTERRUPT);
@@ -104,11 +104,13 @@ void A_timerinterrupt()
     for(int i = win_start; i < win_end && i < BUFFER; i++) {
         if(buffer[i] == "") {
             return;
-        } else {
+        } else if(acks[i] == 0){
             if(i == win_start) {
                 starttimer(0,INTERRUPT);
             }
             tolayer3(0,buf[i]);
+        } else {
+            break;
         }
 
     }
@@ -124,6 +126,7 @@ void A_init()
         acks[i] = -1;
     }
     win_end = getwinsize();
+    window_size = getwinsize();
 }
 
 /* Note that with simplex transfer from a-to-B, there is no B_output() */
