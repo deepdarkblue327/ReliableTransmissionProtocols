@@ -1,17 +1,13 @@
 #include "../include/simulator.h"
 #include<iostream>
 #include<string>
+#include<vector>
 using namespace std;
 
 #define BUFFER 1000
 #define MSG_SIZE 20
 #define INTERRUPT 12.0
 
-string buffer[BUFFER];
-int seqno[BUFFER];
-int index = 0;
-int acks[BUFFER];
-int acked = 0;
 
 struct pkt gen_pkt(string message, int seqnum) {
     struct pkt p;
@@ -41,6 +37,10 @@ bool validate_checksum(struct pkt p) {
     }
 }
 
+vector<pkt> buf;
+vector<int> seqno(1000,-1);
+int seqnum = -1;
+int index = 0;
 /* ******************************************************************
  ALTERNATING BIT AND GO-BACK-N NETWORK EMULATOR: VERSION 1.1  J.F.Kurose
 
@@ -59,7 +59,14 @@ bool validate_checksum(struct pkt p) {
 /* called from layer 5, passed the data to be sent to other side */
 void A_output(struct msg message)
 {
-    buffer[index++] = (char*)message.data;
+    buf.push_back(gen_pkt((char*)message.data,index%2));
+    if(seqno[0] == -1) {
+        tolayer3(0,buf[0]);
+        seqno[0] = 0;
+        starttimer(0,INTERRUPT);
+    }
+    index++;
+    /*buffer[index++] = (char*)message.data;
     for(int i = acked; i < BUFFER; i++) {
         if(buffer[i] != "") {
             if(acks[i] != -1) {
@@ -72,21 +79,17 @@ void A_output(struct msg message)
             break;
         }
     }
+    */
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
 void A_input(struct pkt packet)
 {
     if(validate_checksum(packet)) {
-        for(int i = acked; i < BUFFER; i++) {
-            string a = packet.payload;
-            if(buffer[i]!= "" && acks[i] == 0) {
-                stoptimer(0);
-                buffer[i] = "";
-                acks[i] = 1;
-                acked += 1;
-                break;
-            }
+        if(packet.acknum == buf[0].acknum) {
+            buf.erase(buf.begin());
+            seqno.erase(seqno.begin());
+            stoptimer(0);
         }
     }
 }
@@ -94,23 +97,15 @@ void A_input(struct pkt packet)
 /* called when A's timer goes off */
 void A_timerinterrupt()
 {
-    for(int i = acked; i < BUFFER; i++) {
-        if(buffer[i]!= "") {
-            starttimer(0,INTERRUPT);
-            tolayer3(0,gen_pkt(buffer[i],seqno[i]));
-            break;
-        }
-    }
+    starttimer(0,INTERRUPT);
+    tolayer3(0,buf[0]);
 }
 
 /* the following routine will be called once (only) before any other */
 /* entity A routines are called. You can use it to do any initialization */
 void A_init()
 {
-    for(int i = 0; i < BUFFER; i++) {
-        seqno[i] = i%2;
-        acks[i] = -1;
-    }
+
 }
 
 /* Note that with simplex transfer from a-to-B, there is no B_output() */
@@ -122,9 +117,10 @@ void B_input(struct pkt packet)
 
         if(b_ack%2 == packet.acknum) {
             tolayer5(1,packet.payload);
+
+            tolayer3(1,packet);
             b_ack+=1;
         }
-        tolayer3(1,packet);
     }
 }
 
