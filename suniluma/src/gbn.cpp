@@ -5,7 +5,7 @@ using namespace std;
 
 #define BUFFER 1000
 #define MSG_SIZE 20
-#define INTERRUPT 10.0
+#define INTERRUPT 12.0
 
 string buffer[BUFFER];
 struct pkt buf[BUFFER];
@@ -74,13 +74,15 @@ void A_output(struct msg message)
         acks[index] = 0;
     }
     index++;
-    cout<<index<<endl;
+    cout<<win_start<<endl;
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
 void A_input(struct pkt packet)
 {
-
+    if(packet.acknum == -1) {
+        return;
+    }
     if(validate_checksum(packet)) {
         if(acks[packet.acknum] != 0) {
             return;
@@ -130,12 +132,12 @@ void A_init()
 
 /* Note that with simplex transfer from a-to-B, there is no B_output() */
 int b_ack = 0;
-struct pkt latest;
+struct pkt latest = gen_pkt("",-1);
 /* called from layer 3, when a packet arrives for layer 4 at B*/
 void B_input(struct pkt packet)
 {
     if(validate_checksum(packet)) {
-
+        cout<<b_ack<<" "<<packet.acknum<<endl;
         if(b_ack == packet.acknum) {
             tolayer5(1,packet.payload);
             b_ack+=1;
