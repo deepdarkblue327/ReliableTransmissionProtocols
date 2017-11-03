@@ -7,7 +7,7 @@ using namespace std;
 
 #define BUFFER 1000
 #define MSG_SIZE 20
-#define INTERRUPT 20.0
+#define INTERRUPT 10.0
 
 string buffer[BUFFER];
 struct pkt buf[BUFFER];
@@ -124,6 +124,7 @@ void A_init()
     for(int i = 0; i < BUFFER; i++) {
         seqno[i] = i;
         acks[i] = -1;
+        buffer[i] = "";
     }
     win_end = getwinsize();
     window_size = getwinsize();
@@ -141,10 +142,10 @@ void B_input(struct pkt packet)
             tolayer5(1,packet.payload);
             b_ack+=1;
             latest = packet;
-
         }
 
         tolayer3(1,latest);
+
     }
 }
 
