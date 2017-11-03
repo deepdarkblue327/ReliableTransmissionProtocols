@@ -74,7 +74,6 @@ void A_output(struct msg message)
         acks[index] = 0;
     }
     index++;
-    cout<<win_start<<endl;
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
@@ -137,7 +136,6 @@ struct pkt latest = gen_pkt("",-1);
 void B_input(struct pkt packet)
 {
     if(validate_checksum(packet)) {
-        cout<<b_ack<<" "<<packet.acknum<<endl;
         if(b_ack == packet.acknum) {
             tolayer5(1,packet.payload);
             b_ack+=1;
