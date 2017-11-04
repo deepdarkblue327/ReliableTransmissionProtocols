@@ -59,16 +59,32 @@ bool validate_checksum(struct pkt p) {
    - packets will be delivered in the order in which they were sent
      (although some can be lost).
 **********************************************************************/
-
+int timer_index = 0;
 /********* STUDENTS WRITE THE NEXT SEVEN ROUTINES *********/
 
 /* called from layer 5, passed the data to be sent to other side */
 void A_output(struct msg message)
 {
-    buffer[index++] = (char*)message.data;
-    for(int i = win_start; i < win_end && i < BUFFER; i++) {
+
+    buffer[index] = (char*)message.data;
+    if(index < win_end) {
+        if(index == win_start) {
+            starttimer(0,INTERRUPT);
+            timer_index = index;
+        }
+        tolayer3(0,gen_pkt(buffer[index],index));
+        timer[index] = get_sim_time();
+        acks[index] = 0;
+    }
+    index++;
+
+    /*
+    for(int i = win_start; i < win_end && i < index; i++) {
         if(buffer[i] != "" && acks[i] == -1) {
             timer[i] = get_sim_time();
+            if(i == win_start) {
+                starttimer(0,INTERRUPT);
+            }
             tolayer3(0,gen_pkt(buffer[i],seqno[i]));
             acks[i] = 0;
         }
@@ -81,11 +97,54 @@ void A_output(struct msg message)
             acks[i] = 0;
         }
     }
+    */
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
 void A_input(struct pkt packet)
 {
+    if(validate_checksum(packet)) {
+        if(acks[packet.acknum] != 0) {
+            return;
+        }
+
+
+        acks[packet.acknum] = 1;
+        buffer[packet.acknum] = "";
+        timer[packet.acknum] = -1.0f;
+
+        if(packet.acknum == win_start) {
+            int j = win_start;
+            while(acks[j] == 1) {
+                win_start += 1;
+                j++;
+            }
+            win_end = win_start + getwinsize();
+        }
+
+        if(packet.acknum == timer_index) {
+            stoptimer(0);
+            if(win_start > timer_index) {
+                timer_index = win_start-1;
+            }
+            int in;
+            for(int i = timer_index+1; i < timer_index + getwinsize() && i < index; i++) {
+                if(i >= win_end) {
+                    in = i - win_end;
+                } else{
+                    in = i;
+                }
+                if(timer[in] != -1.0f) {
+                    timer_index = in;
+                    starttimer(0,INTERRUPT - (get_sim_time()-timer[in]));
+
+
+                    break;
+                }
+            }
+        }
+    }
+/*
     if(validate_checksum(packet)) {
         timer[packet.acknum] = -1.0f;
         buffer[packet.acknum] = "";
@@ -99,11 +158,29 @@ void A_input(struct pkt packet)
         }
     }
     win_end = win_start + getwinsize();
+    */
 }
 
 /* called when A's timer goes off */
 void A_timerinterrupt()
 {
+    timer[timer_index] = get_sim_time();
+    tolayer3(0,gen_pkt(buffer[timer_index],timer_index));
+    int in;
+    for(int i = timer_index; i < timer_index + getwinsize() && i < index; i++) {
+        if(i >= win_end) {
+            in = i -win_end;
+        } else{
+            in = i;
+        }
+        if(timer[in] != -1.0f) {
+            starttimer(0,INTERRUPT - (get_sim_time()-timer[in]));
+            cout<<INTERRUPT - (get_sim_time()-timer[in])<<endl;
+            timer_index = in;
+            break;
+        }
+    }
+
     /*
     for(int i = win_start; i < win_end && i < BUFFER; i++) {
         if(buffer[i] == "") {
@@ -125,7 +202,7 @@ void A_init()
 {
     for(int i = 0; i < BUFFER; i++) {
         seqno[i] = i;
-        timer[i] = 0.0f;
+        timer[i] = -1.0f;
         acks[i] = -1;
     }
     win_end = getwinsize();
@@ -152,8 +229,6 @@ void B_input(struct pkt packet)
             b_ack +=1;
         }
     }
-
-
 }
 
 /* the following rouytine will be called once (only) before any other */
