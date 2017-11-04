@@ -5,7 +5,7 @@ using namespace std;
 
 #define BUFFER 1000
 #define MSG_SIZE 20
-#define INTERRUPT 12.0
+#define INTERRUPT 15.0
 
 string buffer[BUFFER];
 struct pkt buf[BUFFER];
