@@ -6,7 +6,7 @@ using namespace std;
 
 #define BUFFER 1000
 #define MSG_SIZE 20
-#define INTERRUPT 15.0
+#define INTERRUPT 20.0
 
 string buffer[BUFFER];
 int seqno[BUFFER];
