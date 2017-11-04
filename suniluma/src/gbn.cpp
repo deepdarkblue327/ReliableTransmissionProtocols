@@ -74,6 +74,7 @@ void A_output(struct msg message)
         acks[index] = 0;
     }
     index++;
+    cout<<index<<endl;
 }
 
 /* called from layer 3, when a packet arrives for layer 4 */
