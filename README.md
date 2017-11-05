@@ -1,4 +1,4 @@
 # Reliable Transmission Protocols Simulation.
-ABT
-GBN
-SR
+Alternating Bit
+Go Back N
+Selective Repeat
