@@ -1,2 +1,1 @@
-# cse489589_assignment2
-MNC Project 2
+# Reliable Transmission Protocols Simulation. ABT, GBN SR
